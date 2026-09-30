@@ -22,16 +22,23 @@ class LoadResult:
     power: float                  # 负载提取功率，瓦
 
 
-def solve_load(params: ChannelParams, load_resistance: float) -> LoadResult:
-    """求解通道在单个负载电阻下的电流与提取功率。"""
+def solve_load(
+    params: ChannelParams, load_resistance: float | None
+) -> LoadResult:
+    """求解通道在单个负载电阻下的电流与提取功率。
+
+    load_resistance 为 None 表示负载开路：电流、功率为零，此时
+    load_resistance 字段同样写 None（开路电压由 open_circuit_voltage 给）。
+    """
     u_oc = open_circuit_voltage(params)
     r_int = internal_resistance(params)
-    if math.isinf(r_int):
-        # 电导率为零：内阻无穷大，回路断开，电流与功率都为零
+    if load_resistance is None or math.isinf(r_int):
+        # 开路或电导率为零（内阻无穷大）：电流与功率都为零
         current = 0.0
+        power = 0.0
     else:
         current = u_oc / (r_int + load_resistance)
-    power = current * current * load_resistance
+        power = current * current * load_resistance
     return LoadResult(
         open_circuit_voltage=u_oc,
         internal_resistance=r_int,

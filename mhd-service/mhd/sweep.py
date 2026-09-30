@@ -40,6 +40,10 @@ def _sample_loads(
     return loads
 
 
+# 分段通道扫描复用同一套采样规则，故对外公开
+sample_loads = _sample_loads
+
+
 def sweep_loads(
     params: ChannelParams, load_min: float, load_max: float, points: int
 ) -> SweepResult:

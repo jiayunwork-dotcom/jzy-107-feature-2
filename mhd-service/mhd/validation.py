@@ -31,33 +31,38 @@ def _require_finite_number(value: object, field: str) -> float:
     return result
 
 
-def validate_channel_params(raw: object) -> ChannelParams:
-    """校验并构造通道参数。任何一项不合法都在计算前抛出 ValidationError。"""
+def validate_channel_params(raw: object, location: str | None = None) -> ChannelParams:
+    """校验并构造通道参数。任何一项不合法都在计算前抛出 ValidationError。
+
+    location 给出这段在分组结构中的位置（如“根组/成员2 的段”），
+    用于错误信息定位；内联单段通道调用时留空，消息文本与老版本一致。
+    """
+    prefix = f"{location}：" if location else ""
     if not isinstance(raw, dict):
-        raise ValidationError("通道参数必须是 JSON 对象")
+        raise ValidationError(f"{prefix}通道参数必须是 JSON 对象")
     missing = [field for field in _CHANNEL_FIELDS if field not in raw]
     if missing:
-        raise ValidationError(f"缺少通道参数: {', '.join(missing)}")
+        raise ValidationError(f"{prefix}缺少通道参数: {', '.join(missing)}")
 
     b = _require_finite_number(raw["magnetic_flux_density"], "magnetic_flux_density")
     if b < 0:
-        raise ValidationError(f"磁感应强度不能为负，收到: {b}")
+        raise ValidationError(f"{prefix}磁感应强度不能为负，收到: {b}")
 
     d = _require_finite_number(raw["electrode_spacing"], "electrode_spacing")
     if d <= 0:
-        raise ValidationError(f"电极间距必须为正，收到: {d}")
+        raise ValidationError(f"{prefix}电极间距必须为正，收到: {d}")
 
     v = _require_finite_number(raw["flow_velocity"], "flow_velocity")
     if v < 0:
-        raise ValidationError(f"流体速度不能为负，收到: {v}")
+        raise ValidationError(f"{prefix}流体速度不能为负，收到: {v}")
 
     sigma = _require_finite_number(raw["conductivity"], "conductivity")
     if sigma < 0:
-        raise ValidationError(f"电导率不能为负，收到: {sigma}")
+        raise ValidationError(f"{prefix}电导率不能为负，收到: {sigma}")
 
     area = _require_finite_number(raw["cross_section_area"], "cross_section_area")
     if area <= 0:
-        raise ValidationError(f"通道截面积必须为正，收到: {area}")
+        raise ValidationError(f"{prefix}通道截面积必须为正，收到: {area}")
 
     return ChannelParams(
         magnetic_flux_density=b,
@@ -68,8 +73,14 @@ def validate_channel_params(raw: object) -> ChannelParams:
     )
 
 
-def validate_load_resistance(raw: object) -> float:
-    """校验单个负载电阻。允许为零（短路，功率为零），不允许为负。"""
+def validate_load_resistance(raw: object) -> float | None:
+    """校验单个负载电阻。
+
+    允许为零（短路，功率为零），不允许为负；JSON 的 null 表示负载开路
+    （仅分段通道需要看清开路环流，单段通道同样接受）。
+    """
+    if raw is None:
+        return None
     load = _require_finite_number(raw, "load_resistance")
     if load < 0:
         raise ValidationError(f"负载电阻不能为负，收到: {load}")
